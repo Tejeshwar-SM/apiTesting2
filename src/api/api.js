@@ -11,7 +11,6 @@ const api = axios.create({
 });
 
 export const getCustomer = async (email, zip) => {
-    //take in the fields and send the request to customer_view to get the customer_id and orderlist
     const req_body = {
         campaign_id: "all",
         start_date: "01/01/2020",
@@ -45,4 +44,63 @@ export const getCustomer = async (email, zip) => {
     }
 }
 
+export const getOrderDetails = async (orderIds) => {
+    const orderDetails = [];
+
+    for (const orderId of orderIds) {
+        try {
+            const req_body = {
+                order_id: [parseInt(orderId)],
+                return_variants: 1
+            };
+
+            const { data } = await api.post("order_view", req_body);
+
+            if (data.response_code === "100") {
+                const processedOrder = {
+                    order_id: data.order_id,
+                    date: data.acquisition_date,
+                    total: parseFloat(data.order_total || 0),
+                    products: data.products?.map(product => ({
+                        name: product.name || 'Unknown Product',
+                        price: parseFloat(product.price || 0),
+                        order_type: product.billing_model?.name || 'Unknown',
+                        recurring_date: product.recurring_date,
+                        next_billing_price: parseFloat(product.next_subscription_product_price || 0),
+                        is_trial: product.is_in_trial === "1",
+                        is_recurring: product.billing_model?.name?.toLowerCase().includes('subscription')
+                    })) || []
+                };
+                orderDetails.push(processedOrder);
+            }
+        } catch (error) {
+            console.error(`Failed to fetch order ${orderId}:`, error);
+        }
+    }
+
+    return orderDetails;
+};
+
+export const getUpcomingSubscriptions = (orderDetails) => {
+    const upcomingPayments = [];
+    const today = new Date();
+
+    orderDetails.forEach(order => {
+        order.products.forEach(product => {
+            if (product.is_recurring && product.recurring_date && product.recurring_date !== '0000-00-00') {
+                const recurringDate = new Date(product.recurring_date);
+                if (recurringDate > today) {
+                    upcomingPayments.push({
+                        product_name: product.name,
+                        date: product.recurring_date,
+                        amount: product.next_billing_price,
+                        is_trial: product.is_trial
+                    });
+                }
+            }
+        });
+    });
+
+    return upcomingPayments.sort((a, b) => new Date(a.date) - new Date(b.date));
+};
 
