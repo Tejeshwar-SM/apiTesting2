@@ -3,7 +3,7 @@ import { getCustomer } from '../api/api';
 
 const Login = ({ onLoginSuccess }) => {
   const [formData, setFormData] = useState({
-    email: '',
+    email: '',  
     zip: ''
   });
   const [loading, setLoading] = useState(false);
